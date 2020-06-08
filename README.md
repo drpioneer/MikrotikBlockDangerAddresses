@@ -12,9 +12,7 @@ Mmm/dd/yyyy hh:mm:ss disk system, error, critical login failure for user system 
 
 It was decided to automate the process of neutralizing all attempts to take over my devices. The result is a script that must be run on a schedule with the desired frequency:
 
-```
 https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
-```
 
 The result of the script is the creation of a black list of addresses, which includes all IP addresses from which unauthorized access attempts were detected:
 
@@ -68,9 +66,7 @@ Mmm/dd/yyyy hh:mm:ss disk system, error, critical login failure for user system 
 
 Было решено автоматизировать процесс нейтрализации всех попыток завладеть моими устройствами. Получился скрипт, который необходимо запускать по расписанию с нужной периодичностью: 
 
-```
 https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
-```
 
 Результат работы скрипта - создание черного списка адресов, в который складываются все IP, откуда были обнаружены попытки несанкционированного доступа:
 
