@@ -1,7 +1,7 @@
 # Script for blocking dangerous addresses that tried to connect to the router
 # https://forummikrotik.ru/viewtopic.php?t=4781&start=20
-# tested on ROS 6.46.5
-# updated 2020/05/28
+# tested on ROS 6.47
+# updated 2020/08/27
 
 # ----------- Stage 1 - search for a device login attempt ----------- 
 foreach routerUser in=[ /user find disabled=no; ] do={
@@ -58,4 +58,16 @@ foreach dangerString in=[ /log find message~"user" message~"authentication faile
             :log warning (">>> Added in black list IP ".$dangerIP." (wrong L2TP user '".$dangerUser."')");
         }
     } on-error={ :log warning ">>> Script error. Not found string 'user' & 'authentication failed' in log."; }
+}    
+
+# ----------- Stage 5 - search for login attempts via WinBox  ----------- 
+foreach dangerString in=[ /log find message~"denied winbox/dude connect from"; ] do={
+    do {
+        :local stringTemp ([ /log get $dangerString message ]);
+        :local dangerIP ([ :pick $stringTemp ([ :find $stringTemp "from" ] + 5) ([ :len $stringTemp ]) ]);
+        if ([ /ip firewall address-list find list="BlockDangerAddress" address=$dangerIP ] = "" ) do={ 
+            /ip firewall address-list add address=$dangerIP list="BlockDangerAddress" timeout=14d;
+            :log warning (">>> Added in black list IP ".$dangerIP." (not allowed WinBox user IP-address)");
+        }
+    } on-error={ :log warning ">>> Script error. Not found string 'denied winbox/dude connect from' in log."; }
 }
