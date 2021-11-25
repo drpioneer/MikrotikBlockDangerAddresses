@@ -22,6 +22,8 @@ Mmm/dd/yyyy hh:mm:ss disk system, error, critical login failure for user system 
 /ip firewall filter add action=drop chain=input comment="Dropping dangerous adresses" src-address-list=BlockDangerAddress
 ```
 
+https://forummikrotik.ru/viewtopic.php?f=14&t=11586
+
 ***Как это работает:***
 
 В список правил Firewall, пользователь добавляет новое, предназначеное для блокировки всех попыток подключения к роутеру с IP-адресов, находящихся в чёрном списке. Чёрный список адресов формируется скриптом автоматически в ходе периодического анализа журнала устройства. Анализ журнала производится в несколько шагов:
