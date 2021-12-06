@@ -1,7 +1,7 @@
 # Script for blocking dangerous addresses that tried to connect to the router by drPioneer
-# https://forummikrotik.ru/viewtopic.php?p=82374#p82374
+# https://forummikrotik.ru/viewtopic.php?t=4781&start=20
 # tested on ROS 6.49
-# updated 2021/11/23
+# updated 2021/12/06
 
 :do {
     :local outMsg "Dangerous addresses detected:";
@@ -83,7 +83,7 @@
                 do {
                     :local stringId1 ("0x".[:pick $dangerStr1 ([:find $dangerStr1 "*"] + 1) [:len $dangerStr1]]);
                     :local stringId2 ("0x".[:pick $dangerStr2 ([:find $dangerStr2 "*"] + 1) [:len $dangerStr2]]);
-                    if (($stringId1 - $stringId2) = 1) do={
+                    if ((($stringId1 - $stringId2) = 1) || (($stringId2 - $stringId1) = 1)) do={
                         :local stringTemp ([ /log get $dangerStr1 message ]);
                         :local dangerUser ([ :pick $stringTemp ([ :find $stringTemp "user" ] + 5) ([ :find $stringTemp "authentication" ] - 1) ]);
                         :local stringTemp ([ /log get $dangerStr2 message ]);
@@ -93,7 +93,7 @@
                             :set outMsg ($outMsg."\r\n>>> Added in black list IP ".$dangerIP." (wrong PPTP user '".$dangerUser."')");
                         }
                     }
-                } on-error={ :set outMsg ($outMsg."\r\n>>> Script error. Not found string of PPTP 'User' & 'Authentication failed' in log."); }
+                } on-error={ :set outMsg ($outMsg."\r\n>>> Script error. Not found string of PPTP 'TCP connection established from' in log."); }
             }
         } on-error={ :set outMsg ($outMsg."\r\n>>> Script error. Not found string of PPTP 'User' & 'Authentication failed' in log."); }
     }
