@@ -1,7 +1,7 @@
 # Script for blocking dangerous addresses that tried to connect to the router by drPioneer
 # https://forummikrotik.ru/viewtopic.php?p=82619#p82619
 # tested on ROS 6.49
-# updated 2021/12/07
+# updated 2021/12/08
 
 :do {
     :local outMsg "Dangerous addresses detected:";
@@ -96,6 +96,14 @@
                 } on-error={ :set outMsg ($outMsg."\r\n>>> Script error. Not found string of PPTP 'TCP connection established from' in log."); }
             }
         } on-error={ :set outMsg ($outMsg."\r\n>>> Script error. Not found string of PPTP 'User' & 'Authentication failed' in log."); }
+    }
+
+    # ----------- Checking & installing firewall-filter rule ----------- 
+    :if ([ /ip firewall filter find src-address-list="BlockDangerAddress"; ] = "") do={
+        /ip firewall filter add action=drop chain=input comment="Dropping dangerous adresses" src-address-list=BlockDangerAddress;
+    }
+    :if ([ /ip firewall filter find src-address-list="BlockDangerAddress" disabled=yes; ] != "") do={
+        /ip firewall filter enable [ /ip firewall filter find src-address-list="BlockDangerAddress" disabled=yes; ];
     }
 
     # ----------- Output searching results ----------- 
