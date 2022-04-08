@@ -2,15 +2,15 @@
 # Script uses ideas by podarok66, evgeniy.demin, Virtue, tgrba, denismikh, MMAXSIM, andrey-d, GregoryGost
 # https://forummikrotik.ru/viewtopic.php?p=84017#p84017
 # tested on ROS 6.49.5
-# updated 2022/04/01
+# updated 2022/04/08
 
 :do {
     # extremeScan: false / true -> Setting log scan level:  false = usual option; true = extremal option.
     # inIfaceList: "value" -> in.Interface List: "internet","WAN" etc. = manual input of the value; "" = automatic value selection; 
 
     :local extremeScan      false;
-    :local timeoutBL        "2w";
     :local inIfaceList      "";
+    :local timeoutBL        "2w";
     :local nameBlackList    "BlockDangerAddress";
     :local nameWhiteList    "WhiteList";
     :local commentRuleBL    "Dropping dangerous addresses";
@@ -65,13 +65,15 @@
 
     #Gateway interface-list search function
     :local IfListGWFinder do={
-        :local gwIface [/ip route get [find dst-address=0.0.0.0/0 active=yes] vrf-interface];
-        :if ([:len [/interface bridge find name=$gwIface]]!=0) do={
-            :foreach brIface in=[/interface bridge port find bridge=$gwIface inactive=no] do={
-                :set gwIface [/interface bridge port get $brIface interface];
-            }
+        :local inetGate [/ip route find dst-address=0.0.0.0/0 active=yes]
+        :local gwInface [/ip route get $inetGate vrf-interface];
+        :local brdgName [/interface bridge find name=$gwInface];
+        :if (([:len $gwInface] > 0) && ([:len $brdgName] > 0)) do={
+            :local ipAddrGt  [/ip route get $inetGate gateway];
+            :local macAddrGt [/ip arp get [find address=$ipAddrGt interface=$gwInface] mac-address];
+            :set   gwInface  [/interface bridge host get [find mac-address=$macAddrGt] interface];
         }
-        :foreach ifList in=[/interface list member find interface=$gwIface] do={
+        :foreach ifList in=[/interface list member find interface=$gwInface] do={
             :return ([/interface list member get $ifList list]);
         }
     }
