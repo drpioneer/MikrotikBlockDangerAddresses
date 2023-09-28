@@ -16,4 +16,4 @@
 
 Запуск настроенного скрипта должен производиться периодически по шедуллеру.
 
-https://forummikrotik.ru/viewtopic.php?p=85250#p85250
+https://forummikrotik.ru/viewtopic.php?p=85687#p85687
