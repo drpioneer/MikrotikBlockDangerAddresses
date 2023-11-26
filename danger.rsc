@@ -1,9 +1,9 @@
-# Script for searching and blocking dangerous addresses
+# Script for searching and blocking dangerous IP-addresses
 # Script uses ideas by podarok66, evgeniy.demin, Virtue, tgrba, denismikh, MMAXSIM, andrey-d, GregoryGost, Chupaka, Jotne, drPioneer.
 # https://forummikrotik.ru/viewtopic.php?p=84017#p84017
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses
-# tested on ROS 6.49.10
-# updated 2023/10/23
+# tested on ROS 6.49.10 & 7.12
+# updated 2023/11/27
 
 :global scriptBlckr;                # flag of the running script(false=>in progress, true=>idle)
 :do {
@@ -18,25 +18,24 @@
     :local commentRuleBL "dropping dangerous addresses"; # comment for blacklist rule
     :local commentRuleWL "white List of IP-addresses";   # comment for whitelist rule
 
-    # function of verifying correctness IP-address v.4 & blacklisting it
-    :local DangerIPAddr do={
-        :if ($1~"[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}") do={
+    # --------------------------------------------------------------------------------- # function of verifying correctness IP-address v.4 & blacklisting it
+    # $1 - IP-addr; $2 - nameBlackList; $3 - timeoutBL; $4 - logEntry; $5 - name of attack
+    :global IPAddrDNG do={
+        :if ($1~"((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
             :if ([/ip firewall address-list find address=$1 list=$2]="") do={ 
                 /ip firewall address-list add address=$1 list=$2 timeout=$3;
-                :put "$[/system clock get time]\tAdded in BlackList IP-address: $1";
-                :if ($4) do={:log warning ">>> Added in BlackList IP: $1"}
+                :put "$[/system clock get time]\tAdded in BlackList IP-addr $1 ($5)";
+                :if ($4) do={:log warning ">>> Added in BlackList IP: $1 ($5)"}
                 :return true;
             }
         }
         :return false;
     }
 
-    # function of converting decimal numbers to hexadecimal
-    :local DecToHex do={
+    # --------------------------------------------------------------------------------- # function of converting decimal numbers to hexadecimal
+    :global DecToHexDNG do={
         :if ($1<10) do={:return "*$1"}
-        :local tempNumber $1;
-        :local result "";
-        :local remainder 0; 
+        :local tempNumber $1; :local result ""; :local remainder 0; 
         :local hexTable [:toarray "0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F"];
         :while ($tempNumber>0) do={
             :set remainder ($tempNumber%16);
@@ -46,7 +45,7 @@
         :return "*$result";
     }
 
-    # string parsing function
+    # --------------------------------------------------------------------------------- # string parsing function
     :local StrParser do={
         :if ([:len [:find $1 $2 -1]]=0) do={:return ""}
         :local startPos ([:find $1 $2 -1]+[:len $2] +1);
@@ -56,20 +55,54 @@
         :return [:pick $1 $startPos $stopPos];
     }
 
-    # gateway interface-list search function
+    # --------------------------------------------------------------------------------- # gateway interface-list search function
     :local IfListGWFinder do={
-        :local inetGate [/ip route find dst-address=0.0.0.0/0 active=yes]
-        :local gwInface [/ip route get $inetGate vrf-interface];
-        :local brdgName [/interface bridge find name=$gwInface];
-        :if ([:len $gwInface]>0 && [:len $brdgName]>0) do={
-            :local ipAddrGt [/ip route get $inetGate gateway];
-            :local macAddrGt [/ip arp get [find address=$ipAddrGt interface=$gwInface] mac-address];
-            :set gwInface [/interface bridge host get [find mac-address=$macAddrGt] interface];
+        :local routeISP [/ip route find dst-address=0.0.0.0/0 active=yes];
+        :if ([:len $routeISP]=0) do={:return ""}
+        :local gwIface [/ip route get $routeISP vrf-interface];
+        :local brdgName [/interface bridge find name=$gwIface];
+        :if ([:len $gwIface]>0 && [:len $brdgName]>0) do={
+            :local ipAddrGt [/ip route get $routeISP gateway];
+            :local macAddrGt [/ip arp get [find address=$ipAddrGt interface=$gwIface] mac-address];
+            :set gwIface [/interface bridge host get [find mac-address=$macAddrGt] interface];
         }
-        :foreach ifList in=[/interface list member find interface=$gwInface] do={:return [/interface list member get $ifList list]}
+        :local ifList [/interface list member find interface=$gwIface];
+        :if ([:len $ifList]!=0) do={
+            :foreach gwList in=$ifList do={:return [/interface list member get $gwList list]}
+        }
+        :return ""
     }
 
-    # main body of the script
+    # --------------------------------------------------------------------------------- # function of dangerous IP finder in LOG
+    :local IpFinder do={                                    # $1 - prev string; $2 - curr string; $3 - next string; 
+        :global DecToHexDNG;                                # $4 - begin pattern by dangerous IP-addr; $5 - end pattern by dangerous IP-addr
+        :global IPAddrDNG;                                  # $6 - name of attack; $7 - nameBlackList; $8 - timeoutBL; $9 - logEntry
+        :local isDang false;                                                                            # sign of detected danger
+        :local prevLen [:len $1]; :local currLen [:len $2]; :local nextLen [:len $3];
+        :if ($currLen=0 or ($prevLen!=0 && $nextLen!=0)) do={:return $isDang};                          # quick exit with incorrect input parameters
+        :local bgnPtrn [:len $4]; :local endPtrn [:len $5]; :local dangIP "";
+        :local arrPrevId [[:parse $1]]; :local arrCurrId [[:parse $2]]; :local arrNextId [[:parse $3]];
+        :local lenPrevId [:len $arrPrevId]; :local lenCurrId [:len $arrCurrId]; :local lenNextId [:len $arrNextId];
+        :if ($lenCurrId=0 or ($prevLen!=0 && lenPrevId=0) or ($nextLen!=0 && $lenNextId=0)) do={:return $isDang}; # quick exit when specified string is not found
+        :foreach currId in=$arrCurrId do={                                                              # selecting current id string
+            :local str [:log get $currId message]; :local strLen [:len $str];                           # text of current string
+            :if ($strLen<200) do={                                                                      # filtering out very long strings
+                :local currHexId ("0x".[:pick $currId ([:find $currId "*"] +1) [:len $currId]]);        # hex id of current string
+                :local prevId "$[$DecToHexDNG ([:tonum ($currHexId)] -1)]";                             # id of previous string
+                :local nextId "$[$DecToHexDNG ([:tonum ($currHexId)] +1)]";                             # id of next string
+                :if ((($prevLen=0 && $nextLen=0 && $lenCurrId!=0)) or\
+                    ($prevLen!=0 && $nextLen=0 && (:len [:find $arrPrevId $prevId]!=0)) or\
+                    ($prevLen=0 && $nextLen=!0 && (:len [:find $arrNextId $nextId]!=0))) do={
+                        :if ($bgnPtrn!=0) do={:set dangIP [:pick $str ([:find $str $4]+$bgnPtrn) $strLen]} else={:set dangIP $str}; # begin of dangerous IP-addr
+                        :if ($endPtrn!=0) do={:set dangIP [:pick $dangIP 0 [:find $dangIP $5]]};        # end   of dangerous IP-addr
+                        :if ([$IPAddrDNG $dangIP $7 $8 $9 $6]) do={:set isDang true};                   # sending suspicious address to verification
+                }
+            }
+        }
+        :return $isDang;
+    }
+
+    # --------------------------------------------------------------------------------- # main body of the script
     :put "$[/system clock get time]\tStart of searching dangerous addresses on '$[/system identity get name]' router";
     :if ([:len $scriptBlckr]=0) do={:set scriptBlckr true}
     :if ($scriptBlckr) do={
@@ -78,7 +111,6 @@
         :set $timeoutBL [:totime $timeoutBL];
 
         # ----------- checking & installing firewall rules -----------
-        :put "$[/system clock get time]\tStage of checking and installing firewall rules:";
         :if ($inIfaceList="") do={:set inIfaceList [$IfListGWFinder]; :put "$[/system clock get time]\tVariable 'inIfaceList' is empty -> so value '$inIfaceList' is automatically assigned"}
         :if ([:len [/interface list find name=$inIfaceList]]!=0) do={
 
@@ -88,8 +120,7 @@
                 /ip firewall layer7-protocol;
                 find;
                 :local fireL7prot [:toarray {
-                    "name=CVE-2023-28771 comment=\"IPsec payload missing: SA\" regexp=\";bash -c \\\"curl [0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]\"";
-
+                    "name=CVE-2023-28771 comment=\"IPsec payload missing: SA\" regexp=\";bash -c \\\"(curl|wget) (http:\\\\/\\\\/|)[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]\"";
                 }];
                 :foreach payLoad in=$fireL7prot do={
                     :set $cmmnt [$StrParser [:tostr $payLoad] "comment="];
@@ -203,77 +234,30 @@
                 :log warning "Check rule properties in 'IP-Firewall-Raw'.";
             }
             /
-        } else={:put "$[/system clock get time]\tATTENTION!!! Not found input list interfaces named '$inIfaceList'. Check it 'Interfaces-Interface List'. Protection does not work!!!"}
+        } else={:put "$[/system clock get time]\tATTENTION!!! Not found list external interfaces named '$inIfaceList'. Check it 'Interfaces-Interface List'. Firewall protection may not work!!!"}
 
-        #----------- stage of searching for failed login attempts -----------
+        #----------- stage of analysis device log -----------
         :local isDetected false;
-        :foreach dangerString in=[:log find topics~"system" message~"login failure for user"] do={
-            :local stringTemp [:log get $dangerString message];
-            :local dangerIP [:pick $stringTemp ([:find $stringTemp "from"] +5) ([:find $stringTemp "via"] -1)];
-            :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
+        :local dataBase {
+            {name="login failure";prev="";curr="[/log find topics~\"system\" message~\"login failure for user\"]";next="";bgn="from ";end=" via";};
+            {name="denied connect";prev="";curr="[/log find topics~\"warning\" message~\"denied winbox/dude connect from\"]";next="";bgn="from ";end=""};
+            {name="L2TP auth failed";prev="";curr="[/log find topics~\"l2tp\" message~\"user\" message~\"authentication failed\"]";next="";bgn="<";end=">"};
+            {name="IPsec wrong passwd";prev="";curr="[/log find topics~\"ipsec\" message~\"parsing packet failed, possible cause: wrong password\"]";next="";bgn="";end="parsing"};
+            {name="IPSec failed proposal";prev="";curr="[/log find topics~\"ipsec\" message~\"failed to pre-process ph1 packet\"]";next="";bgn="";end=" failed"};
+            {name="IPsec ph1 failed due to time up";prev="[/log find topics~\"ipsec\" topics~\"info\" message~\"respond new phase 1 \"]";curr="[/log find topics~\"ipsec\" topics~\"error\" message~\"phase1 negotiation failed due to time up\"]";next="";bgn="<=>";end="["};
+            {name="IKEv2 ident not found";prev="[/log find topics~\"ipsec\" topics~\"error\" message~\"identity not found\"]";curr="[/log find topics~\"ipsec\" message~\"killing ike2 SA\"]";next="";bgn="]-";end="["};
+            {name="IKEv2 payload missing";prev="";curr="[/log find topics~\"firewall\" message~\"payload missing\"]";next="";bgn="proto UDP, ";end=":"};
+            {name="OVPN peer disconn";prev="[/log find topics~\"ovpn\" topics~\"info\" message~\"connection established from\"]";curr="[/log find topics~\"ovpn\" message~\"disconnected <peer disconnected>\"]";next="";bgn="<";end=">"};
+            {name="OVPN unknown opcode";prev="[/log find topics~\"ovpn\" topics~\"error\" message~\"unknown opcode received\"]";curr="[/log find topics~\"ovpn\" message~\"disconnected <bad packet received>\"]";next="";bgn="<";end=">"};
+            {name="OVPN unknown MSG";prev="[/log find topics~\"ovpn\" topics~\"error\" message~\"unknown msg\" or message~\"msg too short\"]";curr="[/log find topics~\"ovpn\" message~\"TCP connection established from\"]";next="";bgn="from ";end=""};
+            {name="PPTP auth failed";prev="";curr="[/log find topics~\"pptp\" message~\"TCP connection established from\"]";next="[/log find topics~\"pptp\" message~\"authentication failed\"]";bgn="from ";end=""};
+            {name="TCP conn establ";prev="";curr="[/log find message~\"TCP connection established from\"]";next="";bgn="from ";end="";extr=true};
+            {name="IPsec due to time up";prev="";curr="[/log find topics~\"ipsec\" message~\"phase1 negotiation failed due to time up\"]";next="";bgn="<=>";end="[";extr=true};
         }
 
-        #----------- stage of searching for login attempts from unknown networks  -----------
-        :foreach dangerString in=[:log find topics~"warning" message~"denied winbox/dude connect from"] do={
-            :local stringTemp [:log get $dangerString message];
-            :local dangerIP [:pick $stringTemp ([:find $stringTemp "from"] +5) ([:len $stringTemp])];
-            :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-        }
-
-        #----------- stage of searching for attempts to enter through an IPsec password -----------
-        :foreach dangerString in=[:log find topics~"ipsec" message~"parsing packet failed, possible cause: wrong password"] do={
-            :local stringTemp [:log get $dangerString message];
-            :local dangerIP [:pick $stringTemp 0 ([:find $stringTemp "parsing"] -1)];
-            :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-        }
-
-        #----------- stage of searching for attempts to enter through IPSec proposal -----------
-        :foreach dangerString in=[:log find topics~"ipsec" message~"failed to pre-process ph1 packet"] do={
-            :local stringTemp [:log get $dangerString message];
-            :local dangerIP [:pick $stringTemp 0 ([:find $stringTemp "failed"] -1)];
-            :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-        }
-
-        #----------- stage of searching for attempts to enter through L2TP -----------
-        :foreach dangerString in=[:log find topics~"l2tp" message~ "user" message~"authentication failed"] do={
-            :local stringTemp [:log get $dangerString message];
-            :local dangerIP [:pick $stringTemp ([:find $stringTemp "<"] +1) [:find $stringTemp ">"]];
-            :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-        }
-
-        #----------- stage of searching for attempts to establish TCP connection -----------
-        :if ($extremeScan) do={
-            :foreach dangerString in=[:log find message~"TCP connection established from"] do={
-                :local stringTemp [:log get $dangerString message];
-                :local dangerIP [:pick $stringTemp ([:find $stringTemp "from"] +5) [:len $stringTemp]];
-                :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-            }
-        } else={
-
-        #----------- stage of searching for attempts to enter through PPTP -----------
-            :local dangerString1 [:toarray [:log find topics~"pptp" message~"authentication failed"]];
-            :local dangerString2 [:toarray [:log find topics~"pptp" message~"TCP connection established from"]];
-            :foreach dangerString in=$dangerString2 do={
-                :local string2 [:log get $dangerString message];
-                :local stringId2 ("0x".[:pick $dangerString ([:find $dangerString "*"] +1) [:len $dangerString]]);
-                :local stringId1 "$[$DecToHex ([:tonum ($stringId2)] +1)]";
-                :if ([:len [:find $dangerString1 $stringId1]]!=0) do={
-                    :local dangerIP [:pick $string2 ([:find $string2 "from"] +5) [:len $string2]];
-                    :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-                }
-            }
-
-        #----------- stage of searching for attempts to enter through OVPN  -----------
-            :local dangerString1 [:toarray [:log find topics~"ovpn" topics~"error" message~"unknown msg" or message~"msg too short"]];
-            :local dangerString2 [:toarray [:log find topics~"ovpn" message~"TCP connection established from"]];
-            :foreach dangerString in=$dangerString2 do={
-                :local string2 [:log get $dangerString message];
-                :local stringId2 ("0x".[:pick $dangerString ([:find $dangerString "*"] +1) [:len $dangerString]]);
-                :local stringId1 "$[$DecToHex ([:tonum ($stringId2)] +1)]";
-                :if ([:len [:find $dangerString1 $stringId1]]!=0) do={
-                    :local dangerIP [:pick $string2 ([:find $string2 "from"] +5) [:len $string2]];
-                    :if [$DangerIPAddr $dangerIP $nameBlackList $timeoutBL $logEntry] do={:set $isDetected true}
-                }
+        :foreach dangObj in=$dataBase do={
+            :if (([:len ($dangObj->"extr")]=0) || ($extremeScan=($dangObj->"extr"))) do={
+                :if [$IpFinder ($dangObj->"prev") ($dangObj->"curr") ($dangObj->"next") ($dangObj->"bgn") ($dangObj->"end") ($dangObj->"name") $nameBlackList $timeoutBL $logEntry] do={:set isDetected true};
             }
         }
 
@@ -289,10 +273,14 @@
         # ----------- script completion -----------
         :if (!$isDetected) do={:put "$[/system clock get time]\tNo new dangerous IP-addresses were found"};
         :set scriptBlckr true;
-    } else={:put "$[/system clock get time]\tScript already being executed..."}
+    } else={
+        :put "$[/system clock get time]\tScript already being executed...";
+    }
+    /system script environment remove [find name~"DNG"];                # clearing memory
     :put "$[/system clock get time]\tEnd of searching dangerous addresses script";
 } on-error={
     # ----------- script error ----------- 
+    /system script environment remove [find name~"DNG"];                # clearing memory
     :set scriptBlckr true;
     :put "Script of blocking dangerous IP addresses worked with errors";
     :log warning "Script of blocking dangerous IP addresses worked with errors";
