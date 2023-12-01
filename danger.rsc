@@ -3,7 +3,7 @@
 # https://forummikrotik.ru/viewtopic.php?p=91464#p91464
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # tested on ROS 6.49.10 & 7.12
-# updated 2023/11/27
+# updated 2023/12/01
 
 :global scriptBlckr;                # flag of the running script(false=>in progress, true=>idle)
 :do {
@@ -90,12 +90,12 @@
                 :local currHexId ("0x".[:pick $currId ([:find $currId "*"] +1) [:len $currId]]);        # hex id of current string
                 :local prevId "$[$DecToHexDNG ([:tonum ($currHexId)] -1)]";                             # id of previous string
                 :local nextId "$[$DecToHexDNG ([:tonum ($currHexId)] +1)]";                             # id of next string
-                :if ((($prevLen=0 && $nextLen=0 && $lenCurrId!=0)) or\
-                    ($prevLen!=0 && $nextLen=0 && (:len [:find $arrPrevId $prevId]!=0)) or\
-                    ($prevLen=0 && $nextLen=!0 && (:len [:find $arrNextId $nextId]!=0))) do={
-                        :if ($bgnPtrn!=0) do={:set dangIP [:pick $str ([:find $str $4]+$bgnPtrn) $strLen]} else={:set dangIP $str}; # begin of dangerous IP-addr
-                        :if ($endPtrn!=0) do={:set dangIP [:pick $dangIP 0 [:find $dangIP $5]]};        # end   of dangerous IP-addr
-                        :if ([$IPAddrDNG $dangIP $7 $8 $9 $6]) do={:set isDang true};                   # sending suspicious address to verification
+                :local findPrev 0; :set findPrev [:len [:find $arrPrevId $prevId]];
+                :local findNext 0; :set findNext [:len [:find $arrNextId $nextId]];
+                :if (($prevLen=0 && $nextLen=0 && $lenCurrId!=0) or ($prevLen!=0 && $nextLen=0 && $findPrev!=0) or ($prevLen=0 && $nextLen=!0 && $findNext!=0)) do={
+                    :if ($bgnPtrn!=0) do={:set dangIP [:pick $str ([:find $str $4]+$bgnPtrn) $strLen]} else={:set dangIP $str}; # begin of dangerous IP-addr
+                    :if ($endPtrn!=0) do={:set dangIP [:pick $dangIP 0 [:find $dangIP $5]]};            # end   of dangerous IP-addr
+                    :if ([$IPAddrDNG $dangIP $7 $8 $9 $6]) do={:set isDang true};                       # sending suspicious address to verification
                 }
             }
         }
