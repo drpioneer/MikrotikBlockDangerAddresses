@@ -1,7 +1,7 @@
 # Script for searching and blocking dangerous IP-addresses
 # Script uses ideas by podarok66, evgeniy.demin, Virtue, tgrba, denismikh, MMAXSIM, andrey-d, GregoryGost, Chupaka, Jotne, drPioneer.
 # https://forummikrotik.ru/viewtopic.php?p=91464#p91464
-# https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
+# https://github.com/drpioneer/MikrotikBlockDangerAddresses
 # tested on ROS 6.49.10 & 7.12
 # updated 2023/12/01
 
