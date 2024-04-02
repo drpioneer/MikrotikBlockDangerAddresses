@@ -3,16 +3,16 @@
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # https://forummikrotik.ru/viewtopic.php?p=70410#p70410
 # tested on ROS 6.49.13 & 7.14.1
-# updated 2023/04/01
+# updated 2023/04/02
 
 :global scriptBlckr; # flag of the running script; false=>in progress, true=>idle
 :do {
-  :local timeoutBL     "8h";  # timeout of blacklist
-  :local inIfaceList   "";    # name of input interface list: "internet","WAN",etc=>manual input value; ""=automatic value selection
-  :local firewallUsage false; # checking & installing firewall rules
-  :local extremeScan   false; # setting log scan level: false=>usual option; true=>extremal option
-  :local logEntry      false; # maintaining log entries
-  :local staticAddrLst false; # converting blacklist from dynamic to static
+  :local timeoutBL     "8h";  # timeout of blacklist ("1w" "2d" "3h" "4m" "5s" "0w0d8h0m0s" etc...)
+  :local extIfaceList  "";    # name of external interface list ("internet" "WAN" or others=>manual input value; ""=>automatic value selection)
+  :local firewallUsage false; # checking & installing firewall rules (false or true)
+  :local extremeScan   false; # setting log scan level (false=>usual option or true=>extremal option)
+  :local logEntry      false; # maintaining log entries (false or true)
+  :local staticAddrLst false; # converting blacklist from dynamic to static (false or true)
   :local nameBlackList "BlockDangerAddress"; # name of blacklist
   :local nameWhiteList "WhiteList";          # name of whitelist
   :local commentRuleBL "dropping dangerous addresses"; # comment for blacklist rule
@@ -21,16 +21,15 @@
   # search of interface-list gateway # no input parameters
   :local GwFinder do={
     :local routeISP [/ip route find dst-address=0.0.0.0/0 active=yes]; :if ([:len $routeISP]=0) do={:return ""}
-    :local gwIfc [/ip route get $routeISP vrf-interface];
-    :if ([:len $gwIfc]=0) do={
-      :set gwIfc [:tostr [/ip route get [find dst-address=0.0.0.0/0 active=yes] immediate-gw]]; :local lenGwIfc [:len $gwIfc];
-      :if ($gwIfc~"%") do={:set gwIfc [:pick $gwIfc ([:find $gwIfc "%"]+1) $lenGwIfc]}}
-    :local brdgName [/interface bridge find name=$gwIfc];
-    :if ([:len $gwIfc]>0 && [:len $brdgName]>0) do={
-      :local ipGw [/ip route get $routeISP gateway]; :local macGw [/ip arp get [find address=$ipGw interface=$gwIfc] mac-address];
-      :set gwIfc [/interface bridge host get [find mac-address=$macGw] interface]}
-    :local ifList [/interface list member find interface=$gwIfc];
-    :if ([:len $ifList]!=0) do={:foreach gwList in=$ifList do={:return [/interface list member get $gwList list]}}
+    :set routeISP "/ip route get $routeISP";
+    :local routeGW {"[$routeISP vrf-interface]";"[$routeISP immediate-gw]";"[$routeISP gateway-status]"}
+    /interface;
+    :foreach ifListMemb in=[list member find] do={
+      :local ifIfac [list member get $ifListMemb interface]; :local ifList [list member get $ifListMemb list];
+      :local brName ""; :do {:set brName [bridge port get [find interface=$ifIfac] bridge]} on-error={}
+      :foreach answer in=$routeGW do={
+        :local gw ""; :do {:set gw [:tostr [[:parse $answer]]]} on-error={}
+        :if ([:len $gw]>0 && $gw~$ifIfac or [:len $brName]>0 && $gw~$brName) do={:return $ifList}}}
     :return ""}
 
   # device log analysis # $1-name of black list $2-timeout of black list $3-log entry $4-curr time $5-extreme scan
@@ -140,7 +139,7 @@
 
   # checking & installing optional firewall rules # $1-firewall usage $2-curr time
   :local ChkFWRul do={
-    # string parsing function # $1-string $2-desired parameter $3-inIfaceList $4-nameBlackList $5-nameWhiteList $6-commentRuleBL $7-commentRuleWL $8-timeoutBL
+    # string parsing function # $1-string $2-desired parameter $3-extIfaceList $4-nameBlackList $5-nameWhiteList $6-commentRuleBL $7-commentRuleWL $8-timeoutBL
     :local StrParser do={
       :if ([:len [:find $1 $2 -1]]=0) do={:return ""}
       :local startPos ([:find $1 $2 -1]+[:len $2] +1); :local stopPos [:find $1 "\"" $startPos];
@@ -236,8 +235,7 @@
         :put "$2\tATTENTION!!! RAW-rule for blocking dangerous IP-addresses is DISABLED.\r\n$2\tCheck rule properties in 'IP-Firewall-Raw'";
         /log warning "ATTENTION!!! Rule for blocking dangerous IP-addresses is DISABLED.";
         /log warning "Check rule properties in 'IP-Firewall-Raw'."}
-      /;
-    }
+      /;}
 
   # main body
   :put "$[$U2T [$T2U]]\tStart of searching dangerous addresses on '$[/system identity get name]' router";
@@ -245,16 +243,14 @@
   :if ($scriptBlckr) do={
     :set scriptBlckr false; :set $timeoutBL [:totime $timeoutBL];
     :if ($extremeScan) do={:put "$[$U2T [$T2U]]\tBE CAREFUL!!!!!! Extreme scanning mode is ENABLED!"}
-    :if ($inIfaceList="") do={:set inIfaceList [$GwFinder]; :put "$[$U2T [$T2U]]\tVariable 'inIfaceList' is empty -> so value '$inIfaceList' is automatically assigned"}
-    :if ([:len [/interface list find name=$inIfaceList]]!=0) do={
-      [$ChkFWRul $firewallUsage [$U2T [$T2U]] $inIfaceList $nameBlackList $nameWhiteList $commentRuleBL $commentRuleWL $timeoutBL];
-    } else={:put "$[$U2T [$T2U]]\tATTENTION!!! Not found list external interfaces named '$inIfaceList'";
+    :if ($extIfaceList="") do={:set extIfaceList [$GwFinder]; :put "$[$U2T [$T2U]]\tVariable 'extIfaceList' is empty -> so value '$extIfaceList' is automatically assigned"}
+    :if ([:len [/interface list find name=$extIfaceList]]!=0) do={
+      [$ChkFWRul $firewallUsage [$U2T [$T2U]] $extIfaceList $nameBlackList $nameWhiteList $commentRuleBL $commentRuleWL $timeoutBL];
+    } else={:put "$[$U2T [$T2U]]\tATTENTION!!! Not found list external interfaces named '$extIfaceList'.";
       :put "$[$U2T [$T2U]]\tCheck it 'Interfaces-Interface List', firewall protection may not work!!!"}
-    :if ($staticAddrLst) do={
-      /ip firewall address-list;
+    :if ($staticAddrLst) do={/ip firewall address-list;
       :foreach idx in=[find dynamic=yes list=$nameBlackList] do={
-        :local ipaddress [get $idx address];
-        remove $idx; add list=$nameBlackList address=$ipaddress}}
+        :local ipaddress [get $idx address]; remove $idx; add list=$nameBlackList address=$ipaddress}}
     :if ([$Analysis $nameBlackList $timeoutBL $logEntry [$U2T [$T2U]] $extremeScan]=0) do={:put "$[$U2T [$T2U]]\tNo new dangerous IP-addresses were found"};
     :set scriptBlckr true;
   } else={:put "$[$U2T [$T2U]]\tScript already being executed..."}
