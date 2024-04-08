@@ -3,7 +3,7 @@
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # https://forummikrotik.ru/viewtopic.php?p=70410#p70410
 # tested on ROS 6.49.13 & 7.14.1
-# updated 2023/04/02
+# updated 2023/04/08
 
 :global scriptBlckr; # flag of the running script; false=>in progress, true=>idle
 :do {
@@ -66,7 +66,7 @@
           :local nextId "$[$Dec2Hex ([:tonum ($currHexId)] +1)]"; # id of next string
           :local findPrev 0; :set findPrev [:len [:find $arrPrevId $prevId]];
           :local findNext 0; :set findNext [:len [:find $arrNextId $nextId]];
-          :if ($prevLen=0 && $nextLen=0 && $lenCurrId!=0 or $prevLen!=0 && $nextLen=0 && $findPrev!=0 or $prevLen=0 && $nextLen=!0 && $findNext!=0) do={
+          :if ($prevLen=0 && $nextLen=0 && $lenCurrId!=0 or $prevLen!=0 && $nextLen=0 && $findPrev!=0 or $prevLen=0 && $nextLen!=0 && $findNext!=0) do={
             :if ($bgnPtrn!=0) do={:set dngIp [:pick $msg ([:find $msg $4]+$bgnPtrn) $strLen]} else={:set dngIp $msg}; # begin of dangerous IP-addr
             :if ($endPtrn!=0) do={:set dngIp [:pick $dngIp 0 [:find $dngIp $5]]}; # end of dangerous ipAddr
             :if ([$IpCheck $dngIp $7 $8 $9 $6 $10]) do={:set isDng true}}}}; # sending suspicious address to verification
