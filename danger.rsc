@@ -80,7 +80,7 @@
         :if ([:len $gw]>0 && $gw~$ifIfac or [:len $brName]>0 && $gw~$brName) do={:return $ifList}}}
     :return ""}
 
-  # checking & installing optional firewall rules # $1-FWusage $2-extIfaceList $3-nameBLt $4-nameWL $5-cmntRuleBL $6-cmntRuleWL $7-timeoutBL
+  # checking & installing optional firewall rules # $1-FWusage $2-extIfaceList $3-nameBL $4-nameWL $5-cmntRuleBL $6-cmntRuleWL $7-timeoutBL
   :local ChkFWRul do={
 
     # string parsing function # $1-string $2-desired parameter
