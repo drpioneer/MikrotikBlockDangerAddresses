@@ -94,7 +94,7 @@
       :if ($1) do={
       /; /ip firewall layer7-protocol; find;
       :local cmmnt ""; :local fireL7prot [:toarray {
-        "name=CVE-2023-28771 comment=\"IPsec payload missing: SA\" regexp=\";bash -c \\\"(curl|wget) (http:\\\\/\\\\/|)[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]\"";}];
+        "name=CVE-2023-28771 comment=\"IPsec payload missing: SA\" regexp=\";bash -c \\\"(curl|wget) (http:\\\\/\\\\/|)[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]\"";} ];
       :foreach payLoad in=$fireL7prot do={
         :set $cmmnt [$StrParser [:tostr $payLoad] "comment="];
         :if ([:len [/ip firewall layer7-protocol find comment=$cmmnt]]=0) do={ 
@@ -256,8 +256,8 @@
     :return $isDetected}
 
   # main body
-  :global numDNG 0; :global timeBlckr; :local timeStamp [$T2UDNG];
-  :put "$[$U2TDNG [$T2UDNG]]\tStart of searching dangerous addresses on '$[/system identity get name]' router";
+  :global numDNG 0; :local startTime [$T2UDNG]; :local currTime [$U2TDNG $startTime];
+  :put "$currTime\tStart of searching dangerous addresses on '$[/system identity get name]' router";
   :if ([:len $scriptBlckr]=0) do={:set scriptBlckr true}
   :if ($scriptBlckr) do={
     :set scriptBlckr false; :set $timeoutBL [:totime $timeoutBL];
@@ -273,14 +273,15 @@
     :if ([$Analysis $nameBlackList $timeoutBL $logEntry $extremeScan $debug]=0) do={
       :put "$[$U2TDNG [$T2UDNG]]\tNo new dangerous IP-addresses were found";
     } else={:put "$[$U2TDNG [$T2UDNG]]\t$numDNG new dangerous IP addresses were found"}
-    :set timeBlckr $timeStamp;
+    :set timeBlckr $startTime;
     :if ($staticAddrLst) do={/ip firewall address-list;
       :foreach idx in=[find dynamic=yes list=$nameBlackList] do={
         :local ipaddress [get $idx address]; remove $idx; add list=$nameBlackList address=$ipaddress}}
+    :set currTime [$U2TDNG [$T2UDNG]];
+    /system script environment remove [find name~"DNG"];
     :set scriptBlckr true;
-  } else={:put "$[$U2TDNG [$T2UDNG]]\tScript already being executed..."}
-  :put "$[$U2TDNG [$T2UDNG]]\tEnd of searching dangerous addresses script";
-  /system script environment remove [find name~"DNG"];
+  } else={:put "$currTime\tScript already being executed..."}
+  :put "$currTime\tEnd of searching dangerous addresses script";
 } on-error={
   :set scriptBlckr true; :put "Script of blocking dangerous IP addresses worked with errors";
   /system script environment remove [find name~"DNG"];
