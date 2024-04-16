@@ -218,7 +218,7 @@
       :local arrPrevId [[:parse $1]]; :local arrCurrId [[:parse $2]]; :local arrNextId [[:parse $3]];
       :local lenPrevId [:len $arrPrevId]; :local lenCurrId [:len $arrCurrId]; :local lenNextId [:len $arrNextId];
       :if ($lenCurrId=0 or $prevLen!=0 && lenPrevId=0 or $nextLen!=0 && $lenNextId=0) do={:return $isDng}; # quick exit when specified string is not found
-      :global timeBlckr; :global T2UDNG; :global U2TDNG;
+      :global timeBlckr; :global T2UDNG;
       :foreach currId in=$arrCurrId do={ # selecting current id string
         :local msg [/log get $currId message]; :local strLen [:len $msg]; :local tim [$T2UDNG [/log get $currId time]];
         :if ($tim>$timeBlckr && $strLen<200) do={ # filtering out old & very long strings
@@ -256,7 +256,7 @@
     :return $isDetected}
 
   # main body
-  :global numDNG 0; :local timeStamp [$T2UDNG];
+  :global numDNG 0; :global timeBlckr; :local timeStamp [$T2UDNG];
   :put "$[$U2TDNG [$T2UDNG]]\tStart of searching dangerous addresses on '$[/system identity get name]' router";
   :if ([:len $scriptBlckr]=0) do={:set scriptBlckr true}
   :if ($scriptBlckr) do={
