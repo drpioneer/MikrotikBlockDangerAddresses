@@ -2,8 +2,8 @@
 # Script uses ideas by podarok66 evgeniy.demin Virtue tgrba denismikh MMAXSIM andrey-d GregoryGost Chupakabra303 Jotne rextended drPioneer
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # https://forummikrotik.ru/viewtopic.php?p=70410#p70410
-# tested on ROS 6.49.14 & 7.14.2
-# updated 2023/04/16
+# tested on ROS 6.49.14 & 7.14.1
+# updated 2023/04/22
 
 :global scriptBlckr; # flag of the running script (false=>in progress / true=>idle)
 :global timeBlckr;   # time of the last log check (unix time)
@@ -182,8 +182,8 @@
     :if ([find src-address-list=$3 disabled=yes]!="") do={
       :put "$[$U2TDNG [$T2UDNG]]\tATTENTION!!! RAW-rule for blocking dangerous IP-addresses is DISABLED";
       :put "$[$U2TDNG [$T2UDNG]]\tCheck rule properties in 'IP-Firewall-Raw'";
-      /log warning "ATTENTION!!! Rule for blocking dangerous IP-addresses is DISABLED.";
-      /log warning "Check rule properties in 'IP-Firewall-Raw'."}
+      /log warning "ATTENTION!!! Rule for blocking dangerous IP-addresses is DISABLED";
+      /log warning "Check rule properties in 'IP-Firewall-Raw'"}
     /;}
 
   # device log analysis # $1-NameBL $2-TimeoutBL $3-LogEntry $4-ExtremeScan $5-Debug
@@ -270,9 +270,9 @@
       :put "$[$U2TDNG [$T2UDNG]]\tCheck it 'Interfaces-Interface List', firewall protection may not work!!!"}
     :if ($timeBlckr=0 or [:len $timeBlckr]=0) do={:put "$[$U2TDNG [$T2UDNG]]\tTime of the last log check was not found"; :set timeBlckr 0;
       } else={:put "$[$U2TDNG [$T2UDNG]]\tTime of the last log check $[$U2TDNG $timeBlckr]";}
-    :if ([$Analysis $nameBlackList $timeoutBL $logEntry $extremeScan $debug]=0) do={
-      :put "$[$U2TDNG [$T2UDNG]]\tNo new dangerous IP-addresses were found";
-    } else={:put "$[$U2TDNG [$T2UDNG]]\t$numDNG new dangerous IP addresses were found"}
+    :if ([$Analysis $nameBlackList $timeoutBL $logEntry $extremeScan $debug]) do={
+      :put "$[$U2TDNG [$T2UDNG]]\t$numDNG new dangerous IP addresses were found";
+    } else={:put "$[$U2TDNG [$T2UDNG]]\tNo new dangerous IP-addresses were found"}
     :set timeBlckr $startTime;
     :if ($staticAddrLst) do={/ip firewall address-list;
       :foreach idx in=[find dynamic=yes list=$nameBlackList] do={
