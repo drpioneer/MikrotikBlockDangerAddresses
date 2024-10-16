@@ -3,7 +3,7 @@
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # https://forummikrotik.ru/viewtopic.php?p=70410#p70410
 # tested on ROS 6.49.17 & 7.16
-# updated 2024/10/14
+# updated 2024/10/16
 
 :global scriptBlckr; # flag of the running script (false=>in progress / true=>idle)
 :global timeBlckr;   # time of the last log check (in unix time)
@@ -189,18 +189,11 @@
     # dangerous IP finder in log
     :local IpFinder do={ # $1-PrevStr $2-CurrStr $3-NextStr $4-BeginPtrn $5-EndPtrn $6-NameAttack $7-NameBL $8-TimeoutBL $9-LogEntry $10-Debug
 
-      # converting decimal numbers to hexadecimal
-      :local Dec2Hex do={ # $1-DecNumb $2-Debug
-        :if ($1<10) do={:if ($2) do={:put ">Dec2Hex__Dec:$1__Hex:$1<"}; :return "*$1"}
-        :local nmb $1; :local res ""; :local rem 0; :local hexTable [:toarray "0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F"];
-        :while ($nmb>0) do={:set $rem ($nmb%16); :set $nmb ($nmb>>4); :set $res (($hexTable->$rem).$res)}
-        :if ($2) do={:put ">>Dec2Hex__Dec:$1__Hex:$res<<"}; :return "*$res"}
-
       # checking correctness IPv4 address & blacklisting it
       :local IpCheck do={ # $1-IPaddr $2-NameBL $3-TimeoutBL $4-LogEntry $5-NameAttack $6-Debug
         :global T2UDNG; :global U2TDNG; :global numDNG;
         :if ($1~"((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
-          :if ($6) do={:put ">IpCheck__ip:$1__list:$2<"}
+          :if ($6) do={:put ">IpCheck__ip:$1<"}
           :if ([/ip firewall address-list find address=$1 list=$2]="") do={
             :set $numDNG ($numDNG+1);
             /ip firewall address-list add address=$1 list=$2 timeout=$3;
@@ -209,58 +202,62 @@
             :return true}}
         :return false}
 
-      # corrected symbols of IPv4 address
+      # correcting characters of IPv4 addr
       :local CorrectIpV4 do={
         :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
         :local sym "0123456789."; :local res "";
-        :for i from=0 to=([:len $1]-1) do={
-          :local chr [:pick $1 $i];
-          :if ([:find $sym $chr]>-1) do={:set $res ($res.$chr)}}
+        :for i from=0 to=([:len $1]-1) do={:local chr [:pick $1 $i]; :if ([:find $sym $chr]>-1) do={:set $res ($res.$chr)}}
         :return [:toip $res]}
 
       :if ($10) do={:put ">>>IpFinder1__Prev:$1__Curr:$2__Next:$3__Begin:$4__End:$5<<<"}
       :local prevLen [:len $1]; :local currLen [:len $2]; :local nextLen [:len $3]; :local isDng false; # sign of detected danger
       :if ($currLen=0 or $prevLen!=0 && $nextLen!=0) do={:return $isDng}; # quick exit with incorrect input parameters
-      :local bgnPtrn [:len $4]; :local endPtrn [:len $5]; :local dngIp "";
-      :local arrPrevId [[:parse $1]]; :local arrCurrId [[:parse $2]]; :local arrNextId [[:parse $3]];
+      /log;
+      :local arrPrevId ""; :if ($prevLen!=0) do={:set $arrPrevId [find message~$1]}
+      :local arrCurrId ""; :if ($currLen!=0) do={:set $arrCurrId [find message~$2]}
+      :local arrNextId ""; :if ($nextLen!=0) do={:set $arrNextId [find message~$3]}
       :local lenPrevId [:len $arrPrevId]; :local lenCurrId [:len $arrCurrId]; :local lenNextId [:len $arrNextId];
       :if ($lenCurrId=0 or $prevLen!=0 && lenPrevId=0 or $nextLen!=0 && $lenNextId=0) do={:return $isDng}; # quick exit when specified string is not found
-      :global timeBlckr; :global T2UDNG;
+      :global timeBlckr; :global T2UDNG; :local bgnPtrn [:len $4]; :local endPtrn [:len $5]; :local dngIp ""; :local line 4;
       :foreach currId in=$arrCurrId do={ # selecting current id string
         :local msg [/log get $currId message]; :local strLen [:len $msg]; :local tim [$T2UDNG [/log get $currId time]];
         :if ($tim>$timeBlckr && $strLen<200) do={ # filtering out old & very long strings
           :local currHexId ("0x".[:pick $currId ([:find $currId "*"] +1) [:len $currId]]); # hex id of current string
-          :local prevId "$[$Dec2Hex ([:tonum ($currHexId)] -1) $10]"; # id of previous string
-          :local nextId "$[$Dec2Hex ([:tonum ($currHexId)] +1) $10]"; # id of next string
-          :local findPrev 0; :set $findPrev [:len [:find $arrPrevId $prevId]];
-          :local findNext 0; :set $findNext [:len [:find $arrNextId $nextId]];
-          :if ($10) do={:put ">>>IpFinder2__msg:$msg__prevId:$prevId__currId:$currHexId__nextId:$nextId<<<"}
-          :if ($prevLen=0 && $lenCurrId!=0 && $nextLen=0 or $prevLen!=0 && $nextLen=0 && $findPrev!=0 or $prevLen=0 && $nextLen!=0 && $findNext!=0) do={
+          :local findPrev false; :local findNext false; 
+          :if ($lenPrevId>0) do={
+            :foreach prevId in=$arrPrevId do={ # selecting previous id string
+              :local prevHexId ("0x".[:pick $prevId ([:find $prevId "*"] +1) [:len $prevId]]); # hex id of previos string
+              :local diff ($currHexId-$prevHexId); :if (($diff>0) && ($diff<$line)) do={:set $findPrev true}}}
+          :if ($lenNextId>0) do={
+            :foreach nextId in=$arrNextId do={ # selecting next id string
+              :local nextHexId ("0x".[:pick $nextId ([:find $nextId "*"] +1) [:len $nextId]]); # hex id of next string
+              :local diff ($nextHexId-$currHexId); :if (($diff>0) && ($diff<$line)) do={:set $findNext true}}}
+          :if ($prevLen=0 && $lenCurrId!=0 && $nextLen=0 or $prevLen!=0 && $nextLen=0 && $findPrev or $prevLen=0 && $nextLen!=0 && $findNext) do={
             :if ($bgnPtrn!=0) do={:set $dngIp [:pick $msg ([:find $msg $4]+$bgnPtrn) $strLen]} else={:set $dngIp $msg}; # begin of dangerous IP-addr
             :if ($endPtrn!=0) do={:set $dngIp [:pick $dngIp 0 [:find $dngIp $5]]}; # end of dangerous ipAddr
-            :set $dngIp [$CorrectIpV4 $dngIp];
+            :set $dngIp [$CorrectIpV4 $dngIp]; # removing non-IPv4 characters
             :if ($10) do={:put ">>>IpFinder3__dngIp:$dngIp__findPrev:$findPrev__findNext:$findNext<<<"}
-            :if ([$IpCheck $dngIp $7 $8 $9 $6 $10]) do={:set $isDng true}
-          }}}; # sending suspicious address to verification
+            :if ([$IpCheck $dngIp $7 $8 $9 $6 $10]) do={:set $isDng true}; # sending suspicious address to verification
+          }}}
       :return $isDng}
 
     :if ($5) do={:put ">>>>Analysis__NameOfBL:$1__Timeout:$2__LogEntry:$3__ExtremeScan:$4<<<<<"}
     :local isDetected false; :local phraseBase {
-      {name="login failure";prev="";curr="[/log find message~\"login failure for user\"]";next="";bgn="from ";end=" via";};
-      {name="denied connect";prev="";curr="[/log find message~\"denied winbox/dude connect from\"]";next="";bgn="from ";end=""};
-      {name="L2TP auth failed";prev="";curr="[/log find message~\"authentication failed\"]";next="";bgn="<";end=">"};
-      {name="IPsec wrong passwd";prev="";curr="[/log find message~\"parsing packet failed, possible cause: wrong password\"]";next="";bgn="";end=" parsing"};
-      {name="IPSec failed proposal";prev="";curr="[/log find message~\"failed to pre-process ph1 packet\"]";next="";bgn="";end=" failed"};
-      {name="IPsec ph1 failed due to time up";prev="[/log find message~\"respond new phase 1 \"]";curr="[/log find message~\"phase1 negotiation failed due to time up\"]";next="";bgn="<=>";end="["};
-      {name="IKEv2 ident not found";prev="[/log find message~\"identity not found\"]";curr="[/log find message~\"killing ike2 SA\"]";next="";bgn="]-";end="["};
-      {name="IKEv2 payload missing";prev="";curr="[/log find message~\"payload missing\"]";next="";bgn="proto UDP, ";end=":"};
-      {name="OVPN peer disconn";prev="[/log find message~\"connection established from\"]";curr="[/log find message~\"disconnected <peer disconnected>\"]";next="";bgn="<";end=">"};
-      {name="OVPN unknown opcode";prev="[/log find message~\"unknown opcode received\"]";curr="[/log find message~\"disconnected <bad packet received>\"]";next="";bgn="<";end=">"};
-      {name="OVPN too short MSG";prev="[/log find message~\"msg too short\"]";curr="[/log find message~\"TCP connection established from\"]";next="";bgn="from ";end=""};
-      {name="OVPN unknown MSG";prev="[/log find message~\"unknown msg\"]";curr="[/log find message~\"TCP connection established from\"]";next="";bgn="from ";end=""};
-      {name="PPTP auth failed";prev="";curr="[/log find message~\"TCP connection established from\"]";next="[/log find message~\"authentication failed\"]";bgn="from ";end=""};
-      {name="TCP conn establ";prev="";curr="[/log find message~\"TCP connection established from\"]";next="";bgn="from ";end="";extr=true};
-      {name="IPsec due to time up";prev="";curr="[/log find message~\"phase1 negotiation failed due to time up\"]";next="";bgn="<=>";end="[";extr=true}}
+      {name="login failure";prev="";curr="login failure for user";next="";bgn="from ";end=" via";};
+      {name="denied connect";prev="";curr="denied winbox/dude connect from";next="";bgn="from ";end=""};
+      {name="L2TP auth failed";prev="";curr="authentication failed";next="";bgn=" <";end=">"};
+      {name="IPsec wrong passwd";prev="";curr="parsing packet failed, possible cause: wrong password";next="";bgn="";end=" parsing"};
+      {name="IPSec failed proposal";prev="";curr="failed to pre-process ph1 packet";next="";bgn="";end=" failed"};
+      {name="IPsec ph1 failed due to time up";prev="respond new phase 1 ";curr="phase1 negotiation failed due to time up";next="";bgn="<=>";end="["};
+      {name="IKEv2 ident not found";prev="identity not found";curr="killing ike2 SA";next="";bgn="]-";end="["};
+      {name="IKEv2 payload missing";prev="";curr="payload missing";next="";bgn="proto UDP, ";end=":"};
+      {name="OVPN peer disconn";prev="connection established from";curr="disconnected <peer disconnected>";next="";bgn="<";end=">"};
+      {name="OVPN unknown opcode";prev="unknown opcode received";curr="disconnected <bad packet received>";next="";bgn="<";end=">"};
+      {name="OVPN too short MSG";prev="msg too short";curr="TCP connection established from";next="";bgn="from ";end=""};
+      {name="OVPN unknown MSG";prev="unknown msg";curr="TCP connection established from";next="";bgn="from ";end=""};
+      {name="PPTP auth failed";prev="";curr="TCP connection established from";next="authentication failed";bgn="from ";end=""};
+      {name="TCP conn establ";prev="";curr="TCP connection established from";next="";bgn="from ";end="";extr=true};
+      {name="IPsec due to time up";prev="";curr="phase1 negotiation failed due to time up";next="";bgn="<=>";end="[";extr=true}}
     :foreach dangObj in=$phraseBase do={
       :if ([:len ($dangObj->"extr")]=0 or $4=($dangObj->"extr")) do={
         :if ([$IpFinder ($dangObj->"prev") ($dangObj->"curr") ($dangObj->"next") ($dangObj->"bgn") ($dangObj->"end") ($dangObj->"name") $1 $2 $3 $5]) do={:set isDetected true}}}
