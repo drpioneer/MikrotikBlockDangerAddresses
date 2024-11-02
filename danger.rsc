@@ -10,7 +10,7 @@
 :do {
   :local timeout "8h";  # timeout of blacklist ("1w" "2d" "3h" "4m" "5s" "0w0d8h0m0s" etc...)
   :local wanLst  "";    # name of external interface list ("internet" "WAN" or others=>manual input value; ""=>automatic value selection)
-  :local fwUsag  true; # checking & installing firewall rules (false or true)
+  :local fwUsag  false; # checking & installing firewall rules (false or true)
   :local xtreme  false; # setting log scan level (false=>usual option or true=>extremal option)
   :local logEnt  false; # maintaining log entries (false or true)
   :local stcAdr  false; # converting blacklist from dynamic to static (false or true)
