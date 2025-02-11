@@ -2,8 +2,8 @@
 # Script uses ideas by podarok66 evgeniy.demin Virtue tgrba denismikh MMAXSIM andrey-d GregoryGost Chupakabra303 Jotne rextended drPioneer
 # https://github.com/drpioneer/MikrotikBlockDangerAddresses/blob/master/danger.rsc
 # https://forummikrotik.ru/viewtopic.php?p=70410#p70410
-# tested on ROS 6.49.17 & 7.16
-# updated 2024/11/01
+# tested on ROS 6.49.17 & 7.17
+# updated 2025/02/11
 
 :global scriptBlckr; # flag of the running script (false=>in progress / true=>idle)
 :global timeBlckr;   # time of the last log check (in unix time)
@@ -23,24 +23,24 @@
   # time translation function to UNIX time # https://forum.mikrotik.com/viewtopic.php?t=75555#p994849
   :global T2UDNG do={ # $1-date/time in any format: "hh:mm:ss","mmm/dd hh:mm:ss","mmm/dd/yyyy hh:mm:ss","yyyy-mm-dd hh:mm:ss","mm-dd hh:mm:ss"
     :local dTime [:tostr $1]; :local yesterDay false; /system clock
-    :local cYear [get date]; :if ($cYear~"....-..-..") do={:set $cYear [:pick $cYear 0 4]} else={:set $cYear [:pick $cYear 7 11]}
-    :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set $dTime "$dTime 00:00:00"}
-    :if ([:len $dTime]=15) do={:set $dTime "$[:pick $dTime 0 6]/$cYear $[:pick $dTime 7 15]"}
-    :if ([:len $dTime]=14) do={:set $dTime "$cYear-$[:pick $dTime 0 5] $[:pick $dTime 6 14]"}
-    :if ([:len $dTime]=8) do={:if ([:totime $1]>[get time]) do={:set $yesterDay true}; :set $dTime "$[get date] $dTime"}
-    :if ([:tostr $1]="") do={:set $dTime ("$[get date] $[get time]")}
+    :local cYear [get date]; :if ($cYear~"....-..-..") do={:set cYear [:pick $cYear 0 4]} else={:set cYear [:pick $cYear 7 11]}
+    :if ([:len $dTime]=10 or [:len $dTime]=11) do={:set dTime "$dTime 00:00:00"}
+    :if ([:len $dTime]=15) do={:set dTime "$[:pick $dTime 0 6]/$cYear $[:pick $dTime 7 15]"}
+    :if ([:len $dTime]=14) do={:set dTime "$cYear-$[:pick $dTime 0 5] $[:pick $dTime 6 14]"}
+    :if ([:len $dTime]=8) do={:if ([:totime $1]>[get time]) do={:set yesterDay true}; :set dTime "$[get date] $dTime"}
+    :if ([:tostr $1]="") do={:set dTime ("$[get date] $[get time]")}
     :local vDate [:pick $dTime 0 [:find $dTime " " -1]]; :local vTime [:pick $dTime ([:find $dTime " " -1]+1) [:len $dTime]]
-    :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set $vGmt ($vGmt-0x100000000)}; :if ($vGmt<0) do={:set $vGmt ($vGmt*-1)}
+    :local vGmt [get gmt-offset]; :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}; :if ($vGmt<0) do={:set vGmt ($vGmt*-1)}
     :local arrMn [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"]; :local vdOff [:toarray "0,4,5,7,8,10"]
     :local month [:tonum [:pick $vDate ($vdOff->2) ($vdOff->3)]]
     :if ($vDate~".../../....") do={
-      :set $vdOff [:toarray "7,11,1,3,4,6"]
-      :set $month ([:find "xxanebarprayunulugepctovecANEBARPRAYUNULUGEPCTOVEC" [:pick $vDate ($vdOff->2) ($vdOff->3)] -1]/2)
-      :if ($month>12) do={:set $month ($month-12)}}
+      :set vdOff [:toarray "7,11,1,3,4,6"]
+      :set month ([:find "xxanebarprayunulugepctovecANEBARPRAYUNULUGEPCTOVEC" [:pick $vDate ($vdOff->2) ($vdOff->3)] -1]/2)
+      :if ($month>12) do={:set month ($month-12)}}
     :local year [:pick $vDate ($vdOff->0) ($vdOff->1)]
     :if ((($year-1968)%4)=0) do={:set ($arrMn->1) -1; :set ($arrMn->2) 30}
     :local toTd ((($year-1970)*365)+(($year-1968)>>2)+($arrMn->$month)+([:pick $vDate ($vdOff->4) ($vdOff->5)]-1))
-    :if ($yesterDay) do={:set $toTd ($toTd-1)};   # bypassing ROS6.xx time format problem after 00:00:00
+    :if ($yesterDay) do={:set toTd ($toTd-1)};   # bypassing ROS6.xx time format problem after 00:00:00
     :return (((((($toTd*24)+[:pick $vTime 0 2])*60)+[:pick $vTime 3 5])*60)+[:pick $vTime 6 8]-$vGmt)}
 
   # time conversion function from UNIX time # https://forum.mikrotik.com/viewtopic.php?p=977170#p977170
@@ -48,19 +48,19 @@
     :local ZeroFill do={:return [:pick (100+$1) 1 3]}
     :local prMntDays [:toarray "0,0,31,59,90,120,151,181,212,243,273,304,334"]
     :local vGmt [:tonum [/system clock get gmt-offset]]
-    :if ($vGmt>0x7FFFFFFF) do={:set $vGmt ($vGmt-0x100000000)}
-    :if ($vGmt<0) do={:set $vGmt ($vGmt*-1)}
+    :if ($vGmt>0x7FFFFFFF) do={:set vGmt ($vGmt-0x100000000)}
+    :if ($vGmt<0) do={:set vGmt ($vGmt*-1)}
     :local tzEpoch ($vGmt+[:tonum $1])
-    :if ($tzEpoch<0) do={:set $tzEpoch 0}; # unsupported negative unix epoch
+    :if ($tzEpoch<0) do={:set tzEpoch 0}; # unsupported negative unix epoch
     :local yearStamp (1970+($tzEpoch/31536000))
     :local tmpLeap (($yearStamp-1968)>>2)
     :if ((($yearStamp-1968)%4)=0) do={:set ($prMntDays->1) -1; :set ($prMntDays->2) 30}
     :local tmpSec ($tzEpoch%31536000)
     :local tmpDays (($tmpSec/86400)-$tmpLeap)
     :if ($tmpSec<(86400*$tmpLeap) && (($yearStamp-1968)%4)=0) do={
-      :set $tmpLeap ($tmpLeap-1); :set ($prMntDays->1) 0; :set ($prMntDays->2) 31; :set $tmpDays ($tmpDays+1)}
-    :if ($tmpSec<(86400*$tmpLeap)) do={:set $yearStamp ($yearStamp-1); :set $tmpDays ($tmpDays+365)}
-    :local mnthStamp 12; :while (($prMntDays->$mnthStamp)>$tmpDays) do={:set $mnthStamp ($mnthStamp-1)}
+      :set tmpLeap ($tmpLeap-1); :set ($prMntDays->1) 0; :set ($prMntDays->2) 31; :set tmpDays ($tmpDays+1)}
+    :if ($tmpSec<(86400*$tmpLeap)) do={:set yearStamp ($yearStamp-1); :set tmpDays ($tmpDays+365)}
+    :local mnthStamp 12; :while (($prMntDays->$mnthStamp)>$tmpDays) do={:set mnthStamp ($mnthStamp-1)}
     :local dayStamp [$ZeroFill (($tmpDays+1)-($prMntDays->$mnthStamp))]
     :local timeStamp (00:00:00+[:totime ($tmpSec%86400)])
     :if ([:len $2]=0) do={:return "$yearStamp/$[$ZeroFill $mnthStamp]/$[$ZeroFill $dayStamp] $timeStamp"} else={:return "$timeStamp"}}
@@ -68,14 +68,13 @@
   # search of interface-list gateway
   :local GwFinder do={ # no input parameters
     :local routeISP [/ip route find dst-address=0.0.0.0/0 active=yes]; :if ([:len $routeISP]=0) do={:return ""}
-    :set $routeISP "/ip route get $routeISP"
+    :set routeISP "/ip route get $routeISP"; /interface
     :local routeGW {"[$routeISP vrf-interface]";"[$routeISP immediate-gw]";"[$routeISP gateway-status]"}
-    /interface
     :foreach ifLstMmb in=[list member find] do={
       :local ifIfac [list member get $ifLstMmb interface]; :local ifList [list member get $ifLstMmb list]
-      :local brName ""; :do {:set $brName [bridge port get [find interface=$ifIfac] bridge]} on-error={}
+      :local brName ""; :do {:set brName [bridge port get [find interface=$ifIfac] bridge]} on-error={}
       :foreach answer in=$routeGW do={
-        :local gw ""; :do {:set $gw [:tostr [[:parse $answer]]]} on-error={}
+        :local gw ""; :do {:set gw [:tostr [[:parse $answer]]]} on-error={}
         :if ([:len $gw]>0 && $gw~$ifIfac or [:len $brName]>0 && $gw~$brName) do={:return $ifList}}}
     :return ""}
 
@@ -87,8 +86,8 @@
       :if ([:len [:find $1 $2 -1]]=0) do={:return ""}
       :local bgn ([:find $1 $2 -1]+[:len $2] +1); :local end [:find $1 "\"" $bgn]
       :if ([:len $3]!=0) do={
-        :if ([:len [:find $1 $3 $bgn]]=0) do={:set $end [:find $1 "\"" $bgn]} else={:set $end [:find $1 $3 $bgn]}}
-      :if ($end<$bgn) do={:set $end ($bgn+1)}
+        :if ([:len [:find $1 $3 $bgn]]=0) do={:set end [:find $1 "\"" $bgn]} else={:set end [:find $1 $3 $bgn]}}
+      :if ($end<$bgn) do={:set end ($bgn+1)}
       :return [:pick $1 $bgn $end]}
 
     :global T2UDNG; :global U2TDNG
@@ -97,7 +96,7 @@
       :local fwL7prt [:toarray {
         "name=CVE-2023-28771 comment=\"IPsec payload missing: SA\" regexp=\";bash -c \\\"(curl|wget) (http:\\\\/\\\\/|)[0-9]+\\\\.[0-9]+\\\\.[0-9]+\\\\.[0-9]\""}]
       :foreach payLoad in=$fwL7prt do={
-        :set $cmnt [$StrParser [:tostr $payLoad] "comment="]
+        :set cmnt [$StrParser [:tostr $payLoad] "comment="]
         :if ([:len [/ip firewall layer7-protocol find comment=$cmnt]]=0) do={
           [:parse "/ip firewall layer7-protocol add $payLoad"]
           :put "$[$U2TDNG [$T2UDNG]]\tFirewall layer7 protocol with comment '$cmnt' not found.\r\n$[$U2TDNG [$T2UDNG]]\tAdded a regular expression"}}
@@ -136,7 +135,7 @@
         "action=add-src-to-address-list chain=input comment=\"add to BlackList attacker who used unopened ports\" address-list=$3 address-list-timeout=$7 dst-address-type=!broadcast in-interface-list=$2";
         "action=drop chain=input comment=\"drop rest of packets\" in-interface-list=$2"}];
       :foreach payLoad in=$fwFltRul do={
-        :set $cmnt [$StrParser [:tostr $payLoad] "comment="]
+        :set cmnt [$StrParser [:tostr $payLoad] "comment="]
         :if ([:len [/ip firewall filter find comment=$cmnt]]=0) do={
           [:parse "/ip firewall filter add $payLoad"]
           :put "$[$U2TDNG [$T2UDNG]]\tFirewall filter rule with comment '$cmnt' not found, added a rule"}}
@@ -144,7 +143,7 @@
       :local fwRawRul [:toarray {
         "action=drop chain=prerouting comment=\"drop DNS parasit traffic\" dst-port=53 protocol=udp in-interface-list=$2"}]
       :foreach payLoad in=$fwRawRul do={
-        :set $cmnt [$StrParser [:tostr $payLoad] "comment="]
+        :set cmnt [$StrParser [:tostr $payLoad] "comment="]
         :if ([:len [/ip firewall raw find comment=$cmnt]]=0) do={
           [:parse "/ip firewall raw add $payLoad"]
           :put "$[$U2TDNG [$T2UDNG]]\tFirewall raw rule with comment '$cmnt' not found, added a rule"}}; /
@@ -162,7 +161,7 @@
         :if ([find action~"passthrough" dynamic=yes]="") do={
           add chain=input comment=$6 src-address-list=$4 disabled=no place-before=($fwFlt->0)
         } else={
-          :set $ruleID [$StrParser [:tostr [get [find action~"passthrough" dynamic=yes]]] ".nextid" ";"]
+          :set ruleID [$StrParser [:tostr [get [find action~"passthrough" dynamic=yes]]] ".nextid" ";"]
           :if ($ruleID!="") do={add chain=input comment=$6 src-address-list=$4 disabled=no place-before=$ruleID}}}}
     :if ([find src-address-list=$4 disabled=yes]!="") do={enable [find src-address-list=$4 disabled=yes]}
     /; /ip firewall raw; :local fwRaw [find]
@@ -173,7 +172,7 @@
         :if ([find action~"passthrough" dynamic=yes]="") do={
           add action=accept chain=prerouting comment=$6 src-address-list=$4 disabled=no place-before=($fwRaw->0)
         } else={
-          :set $ruleID [$StrParser [:tostr [get [find action~"passthrough" dynamic=yes]]] ".nextid" ";"]
+          :set ruleID [$StrParser [:tostr [get [find action~"passthrough" dynamic=yes]]] ".nextid" ";"]
           :if ($ruleID!="") do={add action=accept chain=prerouting comment=$6 src-address-list=$4 disabled=no place-before=$ruleID}}}}
     :if ([find src-address-list=$4 disabled=yes]!="") do={enable [find src-address-list=$4 disabled=yes]}
     :if ([find src-address-list=$3]="") do={add action=drop chain=prerouting comment=$5 src-address-list=$3 in-interface-list=$2 protocol=!tcp disabled=yes}
@@ -195,7 +194,7 @@
         :if ($1~"((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)[.]){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)") do={
           :if ($6) do={:put ">IpCheck__ip:$1<"}
           :if ([/ip firewall address-list find address=$1 list=$2]="") do={
-            :set $numDNG ($numDNG+1)
+            :set numDNG ($numDNG+1)
             /ip firewall address-list add address=$1 list=$2 timeout=$3
             :put "$[$U2TDNG [$T2UDNG]]\tAdded in BlackList IPv4: $1 ($5)"
             :if ($4) do={/log warning ">>> Added in BlackList IPv4: $1 ($5)"}
@@ -206,16 +205,15 @@
       :local CorrectIpV4 do={
         :if ([:typeof $1]!="str" or [:len $1]=0) do={:return ""}
         :local sym "0123456789."; :local res ""
-        :for i from=0 to=([:len $1]-1) do={:local chr [:pick $1 $i]; :if ([:find $sym $chr]>-1) do={:set $res ($res.$chr)}}
+        :for i from=0 to=([:len $1]-1) do={:local chr [:pick $1 $i]; :if ([:find $sym $chr]>-1) do={:set res ($res.$chr)}}
         :return [:toip $res]}
 
       :if ($10) do={:put ">>>IpFinder1__Prev:$1__Curr:$2__Next:$3__Begin:$4__End:$5<<<"}
       :local prevLen [:len $1]; :local currLen [:len $2]; :local nextLen [:len $3]; :local isDng false; # sign of detected danger
       :if ($currLen=0 or $prevLen!=0 && $nextLen!=0) do={:return $isDng}; # quick exit with incorrect input parameters
-      /log
-      :local arrPrevId ""; :if ($prevLen!=0) do={:set $arrPrevId [find message~$1]}
-      :local arrCurrId ""; :if ($currLen!=0) do={:set $arrCurrId [find message~$2]}
-      :local arrNextId ""; :if ($nextLen!=0) do={:set $arrNextId [find message~$3]}
+      /log; :local arrPrevId ""; :if ($prevLen!=0) do={:set arrPrevId [find message~$1]}
+      :local arrCurrId ""; :if ($currLen!=0) do={:set arrCurrId [find message~$2]}
+      :local arrNextId ""; :if ($nextLen!=0) do={:set arrNextId [find message~$3]}
       :local lenPrevId [:len $arrPrevId]; :local lenCurrId [:len $arrCurrId]; :local lenNextId [:len $arrNextId]
       :if ($lenCurrId=0 or $prevLen!=0 && lenPrevId=0 or $nextLen!=0 && $lenNextId=0) do={:return $isDng}; # quick exit when specified string is not found
       :global timeBlckr; :global T2UDNG; :local bgnPtrn [:len $4]; :local endPtrn [:len $5]; :local dngIp ""; :local line 5
@@ -227,25 +225,24 @@
           :if ($lenPrevId>0) do={
             :foreach prevId in=$arrPrevId do={ # selecting previous id string
               :local prevHexId ("0x".[:pick $prevId ([:find $prevId "*"] +1) [:len $prevId]]); # hex id of previos string
-              :local diff ($currHexId-$prevHexId); :if ($diff>0 && $diff<$line) do={:set $findPrev true}}}
+              :local diff ($currHexId-$prevHexId); :if ($diff>0 && $diff<$line) do={:set findPrev true}}}
           :if ($lenNextId>0) do={
             :foreach nextId in=$arrNextId do={ # selecting next id string
               :local nextHexId ("0x".[:pick $nextId ([:find $nextId "*"] +1) [:len $nextId]]); # hex id of next string
-              :local diff ($nextHexId-$currHexId); :if ($diff>0 && $diff<$line) do={:set $findNext true}}}
+              :local diff ($nextHexId-$currHexId); :if ($diff>0 && $diff<$line) do={:set findNext true}}}
           :if ($prevLen=0 && $lenCurrId!=0 && $nextLen=0 or $prevLen!=0 && $nextLen=0 && $findPrev or $prevLen=0 && $nextLen!=0 && $findNext) do={
-            :if ($bgnPtrn!=0) do={:set $dngIp [:pick $msg ([:find $msg $4]+$bgnPtrn) $strLen]} else={:set $dngIp $msg}; # begin of dangerous IPv4 addr
-            :if ($endPtrn!=0) do={:set $dngIp [:pick $dngIp 0 [:find $dngIp $5]]}; # end of dangerous ipAddr
-            :set $dngIp [$CorrectIpV4 $dngIp]; # removing non-IPv4 characters
+            :if ($bgnPtrn!=0) do={:set dngIp [:pick $msg ([:find $msg $4] +$bgnPtrn) $strLen]} else={:set dngIp $msg}; # begin of dangerous IPv4 addr
+            :if ($endPtrn!=0) do={:set dngIp [:pick $dngIp 0 [:find $dngIp $5]]}; # end of dangerous ipAddr
+            :set dngIp [$CorrectIpV4 $dngIp]; # removing non-IPv4 characters
             :if ($10) do={:put ">>>IpFinder3__dngIp:$dngIp__findPrev:$findPrev__findNext:$findNext<<<"}
-            :if ([$IpCheck $dngIp $7 $8 $9 $6 $10]) do={:set $isDng true}; # sending suspicious address to verification
-          }}}
+            :if ([$IpCheck $dngIp $7 $8 $9 $6 $10]) do={:set isDng true}}}}; # sending suspicious address to verification
       :return $isDng}
 
     :if ($5) do={:put ">>>>Analysis__NameOfBL:$1__Timeout:$2__LogEntry:$3__ExtremeScan:$4<<<<<"}
     :local isDetected false; :local phraseBase {
       {name="login failure";prev="";curr="login failure for user";next="";bgn="from ";end=" via"};
       {name="denied connect";prev="";curr="denied winbox/dude connect from";next="";bgn="from ";end=""};
-      {name="L2TP auth failed";prev="";curr="authentication failed";next="";bgn=" <";end=">"};
+      {name="L2TP auth failed";prev="";curr="authentication failed";next="";bgn="<";end=">"};
       {name="IPsec wrong passwd";prev="";curr="parsing packet failed, possible cause: wrong password";next="";bgn="";end=" parsing"};
       {name="IPSec failed proposal";prev="";curr="failed to pre-process ph1 packet";next="";bgn="";end=" failed"};
       {name="IPsec ph1 failed due to time up";prev="respond new phase 1 ";curr="phase1 negotiation failed due to time up";next="";bgn="<=>";end="["};
@@ -266,33 +263,33 @@
   # main body
   :global numDNG 0; :local startTime [$T2UDNG]; :local currTime [$U2TDNG $startTime];
   :put "$currTime\tStart of searching dangerous IPv4 addresses on '$[/system identity get name]' router"
-  :if ([:len $scriptBlckr]=0) do={:set $scriptBlckr true}
+  :if ([:len $scriptBlckr]=0) do={:set scriptBlckr true}
   :if ($scriptBlckr) do={
-    :set $scriptBlckr false; :set $timeout [:totime $timeout]
+    :set scriptBlckr false; :set timeout [:totime $timeout]
     :if ($debug) do={:put "$[$U2TDNG [$T2UDNG]]\tDebug mode is ENABLED"}
     :if ($xtreme) do={:put "$[$U2TDNG [$T2UDNG]]\tBE CAREFUL!!!!!! Extreme scanning mode is ENABLED!"}
-    :if ($wanLst="") do={:set $wanLst [$GwFinder]; :put "$[$U2TDNG [$T2UDNG]]\tVariable 'wanLst' is empty -> so value '$wanLst' is automatically assigned"}
+    :if ($wanLst="") do={:set wanLst [$GwFinder]; :put "$[$U2TDNG [$T2UDNG]]\tVariable 'wanLst' is empty -> so value '$wanLst' is automatically assigned"}
     :if ([:len [/interface list find name=$wanLst]]!=0) do={
       [$ChkFWRul $fwUsag $wanLst $nameBL $nameWL $cmntBL $cmntWL $timeout]
     } else={:put "$[$U2TDNG [$T2UDNG]]\tATTENTION!!! Not found list external interfaces named '$wanLst'."
       :put "$[$U2TDNG [$T2UDNG]]\tCheck it 'Interfaces-Interface List', firewall protection may not work!!!"}
-    :if ($timeBlckr=0 or [:len $timeBlckr]=0) do={:put "$[$U2TDNG [$T2UDNG]]\tTime of the last log check was not found"; :set $timeBlckr 0
+    :if ($timeBlckr=0 or [:len $timeBlckr]=0) do={:put "$[$U2TDNG [$T2UDNG]]\tTime of the last log check was not found"; :set timeBlckr 0
       } else={:put "$[$U2TDNG [$T2UDNG]]\tTime of the last log check $[$U2TDNG $timeBlckr]"}
     :if ([$Analysis $nameBL $timeout $logEnt $xtreme $debug]) do={
       :put "$[$U2TDNG [$T2UDNG]]\t$numDNG new dangerous IPv4 addresses were found"
     } else={:put "$[$U2TDNG [$T2UDNG]]\tNo new dangerous IPv4 addresses were found"}
-    :set $timeBlckr $startTime
+    :set timeBlckr $startTime
     :if ($stcAdr) do={
       /ip firewall address-list
       :foreach idx in=[find dynamic=yes list=$nameBL] do={
         :local ipaddress [get $idx address]; remove $idx; add list=$nameBL address=$ipaddress}}
-    :set $currTime [$U2TDNG [$T2UDNG]]
+    :set currTime [$U2TDNG [$T2UDNG]]
     /system script environment remove [find name~"DNG"]
-    :set $scriptBlckr true
+    :set scriptBlckr true
   } else={:put "$currTime\tScript already being executed..."}
   :put "$currTime\tEnd of searching dangerous IPv4 addresses script"
 } on-error={
-  :set $scriptBlckr true
+  :set scriptBlckr true
   :put "Script of blocking dangerous IPv4 addresses worked with errors"
   /system script environment remove [find name~"DNG"]
   /log warning "Script of blocking dangerous IPv4 addresses worked with errors"}
