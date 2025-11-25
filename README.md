@@ -1,4 +1,26 @@
-# Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру.
+# Script for blocking dangerous IPv4 addresses from which they tried to connect to the router * Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру.
+
+The script automatically blocks IPv4 addresses of intruders probing Mikrotik routers from external networks. The script has no dependencies on third-party functions and scripts. The setting involves editing the values of local variables at the beginning of the script body, a brief description of which is present in the comments. The body of the script must be uploaded to 'System/Scripts', run manually from the terminal window with the command '/system script run <script name>', read the information provided and, if necessary, adjust the operating settings. Next, the startup is configured according to the schedule from the 'System/Scheduler' with the required time period (the typical value is units of minutes).
+
+The script works by creating a blacklist of IPv4 addresses to block them.
+The blacklist is formed in two different independent ways:
+1. based on the analysis of the device's log entries
+  2. using pre-configured Firewall rules
+
+The 1st method is triggered every time the script is run. On the first launch, the entire device log is checked, and on subsequent launches, only the unchecked part of the log is checked. This is done to increase the speed of subsequent log checks. 
+
+The 2nd method is initially disabled, this is done because the Firewall may already be configured and interference with its operation is not desirable.
+The 2nd method is activated manually by setting the 'fwUsag' variable to 'true'.
+After activating the 2nd method, the script configures the Firewall according to the principle: "everything that is not allowed is prohibited" and from that moment on, even if the script is not running, all attempts from outside to probe the router will be considered unauthorized.
+Along the way, when using the 2nd method, each time the script is run, it checks for pre-configured Firewall rules and, if they are missing, installs the missing ones. The script searches for missing Firewall rules based on the comments in the lists: 'Firewall/Filter Rules', 'Firewall/Raw', 'Firewall/Layer7 Protocols'. After installing the Firewall rules, the user needs to manually arrange them according to their preferences. To avoid unexpected blocking when installing new rules, the blocking rules are DISABLED (!!!). The user does the movement and activation of the blocking rules manually. FIREWALL rules are configured in the active 'Safe Mode' mode in case of unexpected loss of connection with the router and for automatic reset of settings to their original state. After completing the settings, the 'Safe Mode' mode must be deactivated. If the blocking rules are left disabled, the script will notify you about this.
+
+As a result, all accesses to the router that have not passed the Firewall check or are displayed in the device log as unauthorized access attempts are blacklisted and blocked for the time specified in the 'timeout' variable. The typical number of entries in the blacklist when blocked for 8 hours can range from several hundred to several thousand (!!!) entries, and directly depends on the activity of intruders.
+
+The script was tested on current versions of RouterOS 6.49.++ and 7.16.++.
+
+Known issues:
+* the script may fail if Firewall rules control is enabled and there are identical rules with different comments in the list.
+* to prevent the script from blocking addresses that affect the performance of network equipment (DNS provider, upstream address, etc.), it makes sense to whitelist them in advance.
 
 Скрипт автоматически блокирует IPv4 адреса злоумышленников, прощупывающих маршрутизаторы Mikrotik из внешних сетей. Скрипт не имеет зависимостей от сторонних функций и скриптов. Настройка подразумевает правку значений локальных переменных в начале тела скрипта, краткое описание которых присутствует в комментариях. Тело скрипта необходимо закинуть в 'System/Scripts', запустить вручную из окна терминала командой '/system script run <имя скрипта>', ознакомиться с представленной информацией и при необходимости подправить рабочие настройки. Далее производится настройка запуска по расписанию из 'System/Scheduler' с необходимым периодом времени (типовое значение составляет единицы минут).
 
@@ -22,6 +44,8 @@
 * работа скрипта может завершаться ошибкой, при включенном контроле правил Firewall и наличии в списке одинаковых правил с отличающимися комментариями.
 * для предотвращения блокировки скриптом адресов, влияющих на работоспособность сетевого оборудования (DNS провайдера, адрес вышестоящего узла и т.п.), имеет смысл заранее внести их в белый список.
 
-Ветка форума с обсуждением скрипта: https://forummikrotik.ru/viewtopic.php?t=11586
+Discussion of the script * Обсуждение скрипта: https://forummikrotik.ru/viewtopic.php?t=11586
 
-Используете скрипт - отметьте это звездочкой, Вам не сложно, а мне приятно!
+**If you use a script, mark it with an asterisk, it's not difficult for you, but it's nice for me**
+**Используете скрипт - отметьте это звездочкой, Вам не сложно, а мне приятно!**
+
