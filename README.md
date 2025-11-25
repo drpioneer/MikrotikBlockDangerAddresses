@@ -1,10 +1,11 @@
-# Script for blocking dangerous IPv4 addresses from which they tried to connect to the router * Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру.
+# Script for blocking dangerous IPv4 addresses from which they tried to connect to the router
+# Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру.
 
 The script automatically blocks IPv4 addresses of intruders probing Mikrotik routers from external networks. The script has no dependencies on third-party functions and scripts. The setting involves editing the values of local variables at the beginning of the script body, a brief description of which is present in the comments. The body of the script must be uploaded to 'System/Scripts', run manually from the terminal window with the command '/system script run <script name>', read the information provided and, if necessary, adjust the operating settings. Next, the startup is configured according to the schedule from the 'System/Scheduler' with the required time period (the typical value is units of minutes).
 
 The script works by creating a blacklist of IPv4 addresses to block them.
 The blacklist is formed in two different independent ways:
-1. based on the analysis of the device's log entries
+  1. based on the analysis of the device's log entries
   2. using pre-configured Firewall rules
 
 The 1st method is triggered every time the script is run. On the first launch, the entire device log is checked, and on subsequent launches, only the unchecked part of the log is checked. This is done to increase the speed of subsequent log checks. 
@@ -21,6 +22,8 @@ The script was tested on current versions of RouterOS 6.49.++ and 7.16.++.
 Known issues:
 * the script may fail if Firewall rules control is enabled and there are identical rules with different comments in the list.
 * to prevent the script from blocking addresses that affect the performance of network equipment (DNS provider, upstream address, etc.), it makes sense to whitelist them in advance.
+
+-------------------
 
 Скрипт автоматически блокирует IPv4 адреса злоумышленников, прощупывающих маршрутизаторы Mikrotik из внешних сетей. Скрипт не имеет зависимостей от сторонних функций и скриптов. Настройка подразумевает правку значений локальных переменных в начале тела скрипта, краткое описание которых присутствует в комментариях. Тело скрипта необходимо закинуть в 'System/Scripts', запустить вручную из окна терминала командой '/system script run <имя скрипта>', ознакомиться с представленной информацией и при необходимости подправить рабочие настройки. Далее производится настройка запуска по расписанию из 'System/Scheduler' с необходимым периодом времени (типовое значение составляет единицы минут).
 
@@ -48,4 +51,5 @@ Discussion of the script * Обсуждение скрипта: https://forummik
 
 **If you use a script, mark it with an asterisk, it's not difficult for you, but it's nice for me**
 **Используете скрипт - отметьте это звездочкой, Вам не сложно, а мне приятно!**
+
 
