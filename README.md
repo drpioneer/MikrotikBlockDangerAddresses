@@ -50,6 +50,8 @@ Known issues:
 Discussion of the script * Обсуждение скрипта: https://forummikrotik.ru/viewtopic.php?t=11586
 
 **If you use a script, mark it with an asterisk, it's not difficult for you, but it's nice for me**
+
 **Используете скрипт - отметьте это звездочкой, Вам не сложно, а мне приятно!**
+
 
 
