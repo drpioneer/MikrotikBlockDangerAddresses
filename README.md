@@ -1,5 +1,4 @@
 # Script for blocking dangerous IPv4 addresses from which they tried to connect to the router
-# Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру.
 
 The script automatically blocks IPv4 addresses of intruders probing Mikrotik routers from external networks. The script has no dependencies on third-party functions and scripts. The setting involves editing the values of local variables at the beginning of the script body, a brief description of which is present in the comments. The body of the script must be uploaded to 'System/Scripts', run manually from the terminal window with the command '/system script run <script name>', read the information provided and, if necessary, adjust the operating settings. Next, the startup is configured according to the schedule from the 'System/Scheduler' with the required time period (the typical value is units of minutes).
 
@@ -24,6 +23,7 @@ Known issues:
 * to prevent the script from blocking addresses that affect the performance of network equipment (DNS provider, upstream address, etc.), it makes sense to whitelist them in advance.
 
 -------------------
+# Cкрипт блокировки опасных IPv4 адресов, с которых пытались произвести подключение к роутеру
 
 Скрипт автоматически блокирует IPv4 адреса злоумышленников, прощупывающих маршрутизаторы Mikrotik из внешних сетей. Скрипт не имеет зависимостей от сторонних функций и скриптов. Настройка подразумевает правку значений локальных переменных в начале тела скрипта, краткое описание которых присутствует в комментариях. Тело скрипта необходимо закинуть в 'System/Scripts', запустить вручную из окна терминала командой '/system script run <имя скрипта>', ознакомиться с представленной информацией и при необходимости подправить рабочие настройки. Далее производится настройка запуска по расписанию из 'System/Scheduler' с необходимым периодом времени (типовое значение составляет единицы минут).
 
@@ -46,12 +46,13 @@ Known issues:
 Известные проблемы:
 * работа скрипта может завершаться ошибкой, при включенном контроле правил Firewall и наличии в списке одинаковых правил с отличающимися комментариями.
 * для предотвращения блокировки скриптом адресов, влияющих на работоспособность сетевого оборудования (DNS провайдера, адрес вышестоящего узла и т.п.), имеет смысл заранее внести их в белый список.
-
+------------------------
 Discussion of the script * Обсуждение скрипта: https://forummikrotik.ru/viewtopic.php?t=11586
 
 **If you use a script, mark it with an asterisk, it's not difficult for you, but it's nice for me**
 
 **Используете скрипт - отметьте это звездочкой, Вам не сложно, а мне приятно!**
+
 
 
 
